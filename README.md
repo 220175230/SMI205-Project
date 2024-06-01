@@ -5,7 +5,7 @@ This is a replication study based on Eady, G., Paskhalis, T., Zilinsky, J., Bonn
 The data set used for the project can be downloaded from this github page: https://github.com/tpaskhalis/ncomms_russia_us_2016 . This also contains the code used by the original authors. 
 
 # Project Documentation 
-This repository contains the four figures produced in this replication study: 
+This repository contains this README file as well as the four figures produced in this replication study: 
 - Figure 1.png
 - Figure 2.png
 - Figure 3.png
