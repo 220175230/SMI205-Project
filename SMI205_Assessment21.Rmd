@@ -1,0 +1,479 @@
+---
+title: "SMI205 Replication Project (2023)"
+author: "220175230"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    code_download: true
+    toc: true
+    toc_depth: 2
+    toc_float:
+      collapsed: false
+      smooth_scroll: true
+  pdf_document:
+    toc: true
+    toc_depth: '2'
+---
+
+```{r start, include=FALSE}
+# Opening key libraries first
+library(rmarkdown)
+library(knitr)
+```
+
+# Replication Project 
+
+### Rpubs link: https://rpubs.com/H220175230/1191007
+### GitHub Repository: https://github.com/220175230/SMI205-Project
+### Study Preregistration form: https://rpubs.com/H220175230/1185493
+
+## Information about this replication project
+* Replication project based on paper, Eady, G., Paskhalis, T., Zilinsky, J., Bonneau, R., Nagler, J., & Tucker, J. A. (2023). Exposure to the Russian Internet Research Agency foreign influence campaign on Twitter in the 2016 US election and its relationship to attitudes and voting behavior. Nature Communications, 14(1), 62. Avaiable at: https://doi.org/10.1038/s41467-022-35576-9
+
+* Replication method:
+  + Used materials obtained from authors
+
+
+## Workspace setup {.tabset .tabset-pills}
+
+### YAML settings
+
+ output: </br>
+  &nbsp; html_document: </br>
+    &nbsp;&nbsp; code_download: true </br>
+    &nbsp;&nbsp;&nbsp; toc: true </br>
+    &nbsp;&nbsp;&nbsp; toc_depth: 2 </br>
+    &nbsp;&nbsp;&nbsp; toc_float: </br>
+      &nbsp;&nbsp;&nbsp;&nbsp; collapsed: false </br>
+      &nbsp;&nbsp;&nbsp;&nbsp; smooth_scroll: true </br>
+
+### Global settings of R chunks
+
+```{r setup, include=TRUE}
+# Global options
+opts_chunk$set(echo=TRUE,
+	             cache=TRUE,
+               comment=NA,
+               message=FALSE,
+               warning=FALSE)
+```
+
+### Libraries
+
+```{r libraries, include=TRUE}
+# All used libraries
+library(rmarkdown)
+library(knitr)
+library(dplyr)
+library(estimatr)
+library(lfe)
+library(lmtest)
+library(MASS)
+library(mvtnorm)
+library(nnet)
+library(sandwich)
+library(tidyr)
+library(cowplot)
+library(lubridate)
+library(openxlsx)
+library(ggplot2)
+library(sjPlot)
+library(reshape2)
+```
+
+### Versions of used packages
+
+```{r versions, echo=FALSE}
+# Versions of used packages
+packages <- c("rmarkdown", "knitr", "dplyr", "estimatr", "lfe", "lmtest", "MASS", "mvtnorm", "nnet", "sandwich", "tidyr", "cowplot", "lubridate", "openxlsx", "ggplot2", "sjPlot", "reshape2")
+names(packages) <- packages
+lapply(packages, packageVersion)
+```
+
+### My enviroment
+
+```{r myR, echo=FALSE}
+# What is my R version?
+version[['version.string']]
+```
+
+## 1. Introduction
+
+The paper examines whether exposure to Russian foreign influence Twitter posts affects the voting choice of voters in the 2016 US election, and specifically whether they are more likely to switch towards Donald Trump. The authors find that there is no significant relationship between exposure to Russian posts and changes in voting behaviour. Their analysis assumes a linear relationship, meaning that the effect does not depend upon the characteristics of the individuals exposed to the posts. It is plausible, however, that effects are heterogeneous. While there is no significant relationship between exposure and voting choices for the full sample, there may be some demographic groups for which the posts do have an influence. Various demographic characteristics may be relevant when considering heterogeneity, including age, education levels, ethnicity, and gender (e.g. Pew Research Center, 2023). This study focuses explicitly on the strength of an individual’s political views and whether this affects the relationship between exposure to Russian tweets and voting patterns. 
+
+The Pew Research Center study (2020) shows that voters rarely switch parties, an outcome consistent with the data used in Eady et al. (2023). They do find, however, that switching is more likely among less politically engaged voters. Such outcomes further suggest that foreign influence campaigns are unlikely to influence the voting choices of more politically engaged voters but have a better chance of influencing those less politically engaged (Fujiwara et al, 2023). This is in part due to politically engaged voters often seeking out information online which align with their current beliefs (Weeks et al, 2017). Given that these voters tend to view posts that reinforce their beliefs, there is often a lesser likelihood of viewing posts that provide alternate viewpoints (Garcia, 2023). 
+
+In order to undertake this extension, the same data as in the original study will be used. The methodology used, however, will be different, with the approach allowing for non-linear effects. Using information in the dataset of Eady et al. (2023) on the strength of a voter’s affiliation to a particular party, the study tests the hypothesis that foreign influence campaigns are more likely to change the voting behaviour of those with moderate political views. The study uses an indicator of where voters rank themselves on a scale (0 being strong Democrat and 1 strong Republican) to address this hypothesis. To test for this heterogeneity or non-linearity, a linear regression model with interaction terms is employed. Specifically, the approach includes an interaction term between the strength of political views and the exposure to foreign influence campaigns. The expectation is that the interaction term will be significant, such that individuals with weaker political views will show a greater likelihood of changing their voting behaviour in respose to Russian tweets.
+
+Given the above information I am testing the hypothesis that voters with more politically moderate views are more likely to be influenced by foreign influence campaigns to change their vote preferences. 
+
+## 2. Data and methods
+
+### 2.1. Data
+
+```{r, results = 'hide'}
+#load in the data 
+us2016_twitter <- readRDS("Survey_Data.rds")
+
+```
+
+
+The data sets used will be the same as in the original study. These have been combined by the original authors into a single unified data set. This involves combining two main databases: 
+1. A YouGov survey including social media information 
+2. Twitter 27 election integrity data sets
+
+There is little information on the original source of these data sets or how to access them. The data set used has 3,500 observations on 190 variables. The authors exclude individuals that do not have a Twitter account, however, while observations where the respondent did not answer have also been excluded from the analysis. I will be focusing on three dependent variables; (1) 'change_rank_trump_over_clinton_w1w3'; (2) 'voted_trump_versus_clinton': and (3) 'voted_trump_versus_clinton_benefit'. All three variables can take on three values, with +1 indicating a shift towards Trump, -1 a shift away from Trump, and 0 indicating no change in voting preference. The first variable captures changes in the ranking of Trump versus Clinton between the 1st and 2nd waves of the survey. The second captures changes that involve a shift towards (or away) Trump, a no vote, or a 3rd candidate (+1), all of which could have benefited Trump. The third captures changes in voting preferences between the 1st wave of the YouGov survey and the actual vote.
+
+My main independent variable is the exposure variable, which captures the extent of exposure to Russian tweets, and is measured as log(1+exposure), where exposure is the number of tweets that the individual is exposed to. The authors add 1 to exposure to allow the log to be calculated for zero exposure. To capture strength of political views the variables pid7 and pid7_factor are used. Pid7 reports information on political views on a scale from 0-1, whilst pid7_factor is a categorical variable of political views with the following categories: "Strong Democrat", "Strong Republican", "Lean Democrat", "Lean Republican", "Not very strong Democrat", "Not very strong Republican" and "Independent". My interest is in the strength of political views generally, not whether they are strongly Democrat or Republican. As such, these variables are recoded, so that 'Strong Democrat' and 'Strong Republican' are both classified as 'Strong', 'Lean Democrat' and 'Lean Republican' are now 'Lean', 'Not very strong Democrat' and 'Not very strong Republican' are 'Not Strong' and 'Independent' remains 'Independent'. As such we have four categories of voter. Pid7 has also been rescaled, ranging from 0 to 0.75, with 0 being ‘Strong’, 0.25 being ‘Lean’, 0.5 being ‘Not Strong’, and 0.75 being ‘Independent’, thus ensuring that higher numbers refer to more moderate political views.  
+
+
+```{r}
+#re-code the data so that education is now split between 'High school or below' and 'College', the race variable is now 'White' or 'Non-White', regions are also divided into 'South', 'Northeast', 'Midwest' and 'West' 
+us2016_recoded <- us2016_twitter %>%
+  filter(have_twitter_data == 1) %>%
+  mutate(
+    income = as.numeric(income),
+    education = factor(case_when(
+      education == "High school or below" ~ "High school or below",
+      education %in% c("College degree", "Post-graduate degree") ~ "College+"
+    ), levels = c("High school or below", "College+")),
+    race = factor(case_when(
+      race == "White" ~ "White",
+      race %in% c("Black", "Hispanic", "Other") ~ "Non-White"
+    ), levels = c("White", "Non-White")),
+    region = factor(region, levels = c("South", "Northeast", "Midwest", "West"))
+  )
+
+#Recode variables into 4 categories "Strong", "Lean", "Not Strong" and "Independent" 
+
+us2016_recoded$pol_strength[us2016_recoded$pid7_factor == "Strong Democrat"] <- "Strong"
+us2016_recoded$pol_strength[us2016_recoded$pid7_factor == "Strong Republican"] <- "Strong"
+us2016_recoded$pol_strength[us2016_recoded$pid7_factor == "Lean Democrat"] <- "Lean"
+us2016_recoded$pol_strength[us2016_recoded$pid7_factor == "Lean Republican"] <- "Lean"
+us2016_recoded$pol_strength[us2016_recoded$pid7_factor == "Not very strong Democrat"] <- "Not Strong"
+us2016_recoded$pol_strength[us2016_recoded$pid7_factor == "Not very strong Republican"] <- "Not Strong"
+us2016_recoded$pol_strength[us2016_recoded$pid7_factor == "Independent"] <- "Independent"
+
+#Recode variables 
+us2016_recoded$pol_strength_num[us2016_recoded$pid7_factor == "Strong Democrat"] <- 0
+us2016_recoded$pol_strength_num[us2016_recoded$pid7_factor == "Strong Republican"] <- 0
+us2016_recoded$pol_strength_num[us2016_recoded$pid7_factor == "Lean Democrat"] <- .25
+us2016_recoded$pol_strength_num[us2016_recoded$pid7_factor == "Lean Republican"] <- .25
+us2016_recoded$pol_strength_num[us2016_recoded$pid7_factor == "Not very strong Democrat"] <- .5
+us2016_recoded$pol_strength_num[us2016_recoded$pid7_factor == "Not very strong Republican"] <- .5
+us2016_recoded$pol_strength_num[us2016_recoded$pid7_factor == "Independent"] <- 0.75
+
+
+```
+
+```{r}
+# Average value of the newly created political strength variable
+mean(us2016_recoded$pol_strength_num, na.rm = TRUE)
+```
+```{r}
+# Plot of distribution of newly created political strength variable
+desc_plot <- ggplot((data = us2016_recoded), aes(x = pol_strength, na.rm = TRUE)) + labs(x = "Political Strength", y = "Count", title = "Figure 1: Distribution of Political Views") +
+    geom_bar() 
+
+desc_plot
+
+```
+From the above we can see that the mean of the variable of interest is 0.27 (so the approximate value of a ‘Not Strong’ voter), with Figure 1 indicating that the majority of respondents classified themselves as either "Strong Democrat" or "Strong Republican". 
+
+```{r}
+# Descriptive two-way tables on numbers switching vote by political leaning
+desc_table_1 <- table(us2016_recoded$pol_strength_num, us2016_recoded$change_rank_trump_over_clinton_w1w3)
+colnames(desc_table_1) = c("Away from Trump", "No Change", "Towards Trump")
+rownames(desc_table_1) = c("Strong", "Not Strong", "Lean", "Independent") 
+desc_table_1
+
+desc_table_2 <- table(us2016_recoded$pol_strength_num, us2016_recoded$voted_trump_versus_clinton)
+colnames(desc_table_2) = c("Away from Trump", "No Change", "Towards Trump")
+rownames(desc_table_2) = c("Strong", "Not Strong", "Lean", "Independent") 
+desc_table_2
+
+
+desc_table_3 <- table(us2016_recoded$pol_strength_num, us2016_recoded$voted_trump_versus_clinton_benefit)
+colnames(desc_table_3) = c("Away from Trump", "No Change", "Towards Trump")
+rownames(desc_table_3) = c("Strong", "Not Strong", "Lean", "Independent") 
+desc_table_3
+
+```
+The tables above describe the distribution of each of the three dependent variables by strength of political views. Certain patterns can be noted. Firstly "No change" has the highest percentages across all groups, indicating that relatively few voters tend to change their voting intentions. Of those that change, the changers are generally favourable for Trump. As expected, independents are more likely to switch than other groups, especially those with strong political views. 
+
+
+### 2.2. Methods
+
+The original paper uses Ordinary Least Squares (OLS) regression, estimating a linear relationship between exposure to Russian tweets and changes in voter preferences. The original study also included a range of control variables (e.g., race, gender) in the regression. This study also uses OLS regression, but includes an interaction between the exposure variable and an indicator of the strength of political views. This is done in two ways.
+
+Firstly, an interaction between the exposure variable and the numerical variable capturing the strength of political views is included. These two variables are also included individually. The numerical variable takes on values of 0, 0.25, 0.5, or 0.75, with higher values indicating less strong political views. As such, a positive coefficient on the interaction would indicate that people with less strong political views are more likely to switch their vote choice for a given level of exposure to Russian tweets.
+
+A shortcoming of the standard interaction term described above is that it assumes that the difference in likelihood of switching vote is the same for strong vs lean as it is for not strong vs independent. A second approach relaxes this assumption. In this case, the exposure variable is interacted with a categorical variable. This results in the estimation of a coefficient on the exposure variable and coefficients on three interactions of the exposure variable with dummy variables for lean, not strong, and independent. In this case, the coefficient on the non-interacted exposure variable captures the effect of exposure on vote choice for the excluded category (i.e., strong political views), while the coefficients on the three interactions capture the effects of exposure on vote choice for the three other categories. By estimating separate coefficients for each category, this approach doesn’t restrict the difference in coefficients to be the same between consecutive categories. 
+
+
+
+## 3. Results
+
+To examine whether the influence of exposure to Russian tweets depends on how strong an individual's political views are, an interaction between the exposure variable and political strength variable is included in the model. Given that higher numbers of the political strength variable imply a more independent (less politically strong) view, then a positive (and significant) coefficient on the interaction term would mean that more politically independent voters are more likely to switch their vote (towards Trump) in response to exposure to Russian tweets. 
+
+
+```{r echo = TRUE, results ='hide'}
+#===============================================================================
+# Introduce the Interactions between Exposure and Strength of Political Views
+
+#Create a new Table E6 with Interaction term 
+vote_rank_total_russia_count_lm_controls <- lm(change_rank_trump_over_clinton_w1w3 ~  total_exposure_russia_log * pol_strength_num + age + gender + education + income + race + region + internet_social_media_w1, data = us2016_recoded)
+summary(vote_rank_total_russia_count_lm_controls)
+
+confint(vote_rank_total_russia_count_lm_controls)
+
+vote_rank_total_russia_count_lm_controls_black <- lm(change_rank_trump_over_clinton_w1w3 ~  total_exposure_russia_log * pol_strength_num + age + gender + education + income + race_other_hispanic + race_black + region + internet_social_media_w1, data = us2016_recoded)
+summary(vote_rank_total_russia_count_lm_controls_black)
+
+confint(vote_rank_total_russia_count_lm_controls_black)
+
+vote_rank_total_russia_count_lm_controls_total_tweets <- lm(change_rank_trump_over_clinton_w1w3 ~  total_exposure_russia_log * pol_strength_num + age + gender + education + income + race_other_hispanic + race_black + region + internet_social_media_w1 + total_tweets_log + pol_strength_num, data = us2016_recoded)
+summary(vote_rank_total_russia_count_lm_controls_total_tweets)
+
+confint(vote_rank_total_russia_count_lm_controls_total_tweets)
+```
+
+```{r}
+#Create a tab model combining the above regressions 
+tab_model (vote_rank_total_russia_count_lm_controls, vote_rank_total_russia_count_lm_controls_black, vote_rank_total_russia_count_lm_controls_total_tweets, pred.labels = c ("Constant", "Exposure", "Political Views", "Age", " Woman", "College-educated", "Income", "Person of Color", "Region: Northeast", "Region: Midwest", "Region: West", "Freq. of social media use", "Exposure * Political Views", "Other/Hispanic", "Black", "log(Total Tweets)"), title = "Table 1: Non-linear effects of exposure to Russian tweets on the likelihood of shifting voter preference between survey waves", digits = 3, 
+           dv.labels = c("(1)", "(2)", "(3)"),
+           order.terms = c(2, 3, 13, 4, 5, 6, 7, 14, 15, 8, 9, 10, 11, 16, 12, 1), 
+            p.style = "stars", show.ci = FALSE, vcov.fun = "HC0", show.se = TRUE)
+```
+
+Beginning with Table 1, which reports the results when using the first dependent variable, the coefficient on the level of exposure is positive, which indicates a positive association between exposure to Russian tweets and the probability of switching towards Trump for those with strong political views (i.e., a political strength value of zero). 
+```{r}
+plot_model(vote_rank_total_russia_count_lm_controls, type = "pred", terms = c("total_exposure_russia_log", "pol_strength_num")) + labs(title = "Figure 2: Nonlinear effect of exposure to Russian tweets on change 
+in voting preferences towards Trump between survey 
+Wave 1 and 2", x = " Total Exposure (log +1)", y = "Change in voting preference 
+towards Trump between Wave 1 and Wave 2", color = "Strength of Political Views")
+```
+
+The interaction term (exposure * political strength) is found to be negative and significant indicating that the probability of shifting towards Trump is smaller for those that have less strong political views. This can be seen in Figure 2. The figure also reports the confidence intervals and effects are generally not significant at the 5% level. This indicates that the impact is found to be positive for strong political views and negative for the other three. The effects are generally not significant thought at the 95% level. There are exceptions, however, with high levels of exposure significantly reducing the probability of changing for more independent voters. At the 90% level, effects are significant, including the positive effect of exposure on the probability of shifting for those with stronger views. 
+
+```{r echo = TRUE, results ='hide'}
+# New Table E7 with Interaction
+vote_rank_total_russia_count_lm_controls <- lm(voted_trump_versus_clinton ~  total_exposure_russia_log * pol_strength_num + age + gender + education + income + race + region + internet_social_media_w1, data = us2016_recoded)
+summary(vote_rank_total_russia_count_lm_controls)
+
+confint(vote_rank_total_russia_count_lm_controls)
+
+vote_rank_total_russia_count_lm_controls_black <- lm(voted_trump_versus_clinton ~  total_exposure_russia_log * pol_strength_num + age + gender + education + income + race_other_hispanic + race_black + region + internet_social_media_w1, data = us2016_recoded)
+summary(vote_rank_total_russia_count_lm_controls_black)
+
+confint(vote_rank_total_russia_count_lm_controls_black)
+
+
+vote_rank_total_russia_count_lm_controls_total_tweets <- lm(voted_trump_versus_clinton ~  total_exposure_russia_log * pol_strength_num + age + gender + education + income + race_other_hispanic + race_black + region + internet_social_media_w1 + total_tweets_log + pol_strength_num, data = us2016_recoded)
+summary(vote_rank_total_russia_count_lm_controls_total_tweets)
+
+confint(vote_rank_total_russia_count_lm_controls_total_tweets)
+```
+
+```{r}
+#Create a tab model combining the above regressions 
+tab_model (vote_rank_total_russia_count_lm_controls, vote_rank_total_russia_count_lm_controls_black, vote_rank_total_russia_count_lm_controls_total_tweets, pred.labels = c ("Constant", "Exposure", "Political Views", "Age", " Woman", "College-educated", "Income", "Person of Color", "Region: Northeast", "Region: Midwest", "Region: West", "Freq. of social media use", "Exposure * Political Views", "Other/Hispanic", "Black", "log(Total Tweets)"), title = "Table 2: Non-linear effects of exposure to Russian tweets on the likelihood of shifting voter preference towards Trump, a no vote, or a 3rd candidate", digits = 3, 
+           dv.labels = c("(1)", "(2)", "(3)"),
+           order.terms = c(2, 3, 13, 4, 5, 6, 7, 14, 15, 8, 9, 10, 11, 16, 12, 1), 
+            p.style = "stars", show.ci = FALSE, vcov.fun = "HC0", show.se = TRUE)
+```
+
+
+```{r}
+plot_model(vote_rank_total_russia_count_lm_controls, type = "pred", terms = c("total_exposure_russia_log", "pol_strength_num")) + labs(title = "Figure 3:  Nonlinear effect of exposure to Russian tweets 
+                on changes in voter preference towards Trump, third party 
+                candidates or no vote", x = " Total Exposure (log +1)", 
+y = "Change in voting preference towards Trump, 
+      third party candidates and no vote"     , color = "Strength of Political Views")
+```
+
+In terms of the signs of the effects, Table 2, which reports results from the second dependent variable, is consistent with those in 1, but none of the coefficients are significant. This would imply that exposure has no impact on the probability of changing voting intentions and that there are no significant differences between groups when considering a dependent variable that also allows for changes towards third candidates or choosing not to vote. 
+
+The results in Table 3 below, which reports results when using the third dependent variable, also show the same signs on the main coefficients as in the other two tables. Here the final specification provides the strongest evidence of a positive effect of exposure on changing the voting intentions of those with strong political views, with the coefficient on the exposure variable being positive and significant. While the coefficient on the interaction term is negative, consistent with previous results, it is not significant. 
+
+```{r echo = TRUE, results ='hide'}
+# New Table E8 with Interaction
+
+vote_rank_total_russia_count_lm_controls <- lm(voted_trump_versus_clinton_benefit ~  total_exposure_russia_log * pol_strength_num + age + gender + education + income + race + region + internet_social_media_w1, data = us2016_recoded)
+summary(vote_rank_total_russia_count_lm_controls)
+
+confint(vote_rank_total_russia_count_lm_controls)
+
+
+vote_rank_total_russia_count_lm_controls_black <- lm(voted_trump_versus_clinton_benefit ~  total_exposure_russia_log * pol_strength_num + age + gender + education + income + race_other_hispanic + race_black + region + internet_social_media_w1, data = us2016_recoded)
+
+summary(vote_rank_total_russia_count_lm_controls_black)
+
+confint(vote_rank_total_russia_count_lm_controls_black )
+
+
+vote_rank_total_russia_count_lm_controls_total_tweets <- lm(voted_trump_versus_clinton_benefit ~  total_exposure_russia_log * pol_strength_num + age + gender + education + income + race_other_hispanic + race_black + region + internet_social_media_w1 + total_tweets_log + pol_strength_num, data = us2016_recoded)
+
+summary(vote_rank_total_russia_count_lm_controls_total_tweets)
+
+confint(vote_rank_total_russia_count_lm_controls_total_tweets)
+```
+```{r}
+#Create a tab model combining the above regressions 
+tab_model(vote_rank_total_russia_count_lm_controls, vote_rank_total_russia_count_lm_controls_black, vote_rank_total_russia_count_lm_controls_total_tweets, pred.labels = c ("Constant", "Exposure", "Political Views", "Age", " Woman", "College-educated", "Income", "Person of Color", "Region: Northeast", "Region: Midwest", "Region: West", "Freq. of social media use", "Exposure * Political Views", "Other/Hispanic", "Black", "log(Total Tweets)"),  title = "Table 3: Non-linear effects of exposure to Russian tweets on changes in voting preferences between the 1st wave of the YouGov survey and the actual vote", digits = 3, 
+           dv.labels = c("(1)", "(2)", "(3)"),
+           order.terms = c(2, 3, 13, 4, 5, 6, 7, 14, 15, 8, 9, 10, 11, 16, 12, 1), 
+            p.style = "stars", show.ci = FALSE, vcov.fun = "HC0", show.se = TRUE)
+```
+
+```{r}
+plot_model(vote_rank_total_russia_count_lm_controls, type = "pred", terms = c("total_exposure_russia_log", "pol_strength_num")) + 
+  labs(title = "Figure 4:  Nonlinear effect of exposure to Russian tweets on 
+  changes in voting preferences between the 1st wave of the 
+       YouGov survey and the actual vote. ", x = "Total Exposure (log +1)", 
+       y = "Change in voting preference between the 1st 
+       wave of the survey and the actual vote",  color = "Strength of Political Views")
+```
+
+This following results interact the exposure variable with the categorical political strength variable. In this case the linear exposure variable will refer to the coefficient on exposure for the omitted group (independent voters) while the coefficients on the three different interactions refer to the coefficients on the exposure variable for the other three political strength groups. 
+```{r echo = TRUE, results ='hide'}
+# Introduce the Interactions between Exposure and Strength of Political Views
+
+# New Table E6 with Interaction (This is an alternative where we estimate a separate coefficient on exposure for each type of political strength)
+
+vote_rank_total_russia_count_lm_controls_new1 <- lm(change_rank_trump_over_clinton_w1w3 ~  total_exposure_russia_log * pol_strength + age + gender + education + income + race + region + internet_social_media_w1, data = us2016_recoded)
+summary(vote_rank_total_russia_count_lm_controls_new1)
+
+confint(vote_rank_total_russia_count_lm_controls_new1)
+
+
+
+vote_rank_total_russia_count_lm_controls_black_new1 <- lm(change_rank_trump_over_clinton_w1w3 ~  total_exposure_russia_log * pol_strength + age + gender + education + income + race_other_hispanic + race_black + region + internet_social_media_w1, data = us2016_recoded)
+summary(vote_rank_total_russia_count_lm_controls_black_new1)
+
+confint(vote_rank_total_russia_count_lm_controls_black_new1)
+
+
+
+vote_rank_total_russia_count_lm_controls_total_tweets_new1 <- lm(change_rank_trump_over_clinton_w1w3 ~  total_exposure_russia_log * pol_strength + age + gender + education + income + race_other_hispanic + race_black + region + internet_social_media_w1 + total_tweets_log, data = us2016_recoded)
+summary(vote_rank_total_russia_count_lm_controls_total_tweets_new1)
+
+confint(vote_rank_total_russia_count_lm_controls_total_tweets_new1)
+
+```
+
+```{r}
+tab_model (vote_rank_total_russia_count_lm_controls_new1, vote_rank_total_russia_count_lm_controls_black_new1, vote_rank_total_russia_count_lm_controls_total_tweets_new1, pred.labels = c ("Constant", "Exposure - Independent", "Political Views - Lean", "Political Views - Not Strong", "Political Views - Strong", "Age", "Woman", "College-educated", "Income", "Person of Color", "Region: Northeast", "Region: Midwest", "Region: West", "Freq. of social media use", "Exposure - Lean", "Exposure - Not Strong", "Exposure - Strong", "Other/Hispanic", "Black", "log(Total Tweets)"),  title = "Table 4: Non-linear effects of exposure to Russian tweets on the likelihood of shifting voter preference between waves of the survey ", digits = 3, 
+           dv.labels = c("(1)", "(2)", "(3)"),
+           order.terms = c(2, 15, 16, 17, 3, 4, 5, 6, 7, 8, 9, 10, 18, 19, 11, 12, 13, 20, 14, 1), 
+            p.style = "stars", show.ci = FALSE, vcov.fun = "HC0", show.se = TRUE)
+
+```
+
+In table 4 we find a negative effect on the exposure variable for independent voters, implying that greater exposure is associated with a lower probability of changing vote for independents. Conversely the coefficient for strong political views is positive and significant, so higher exposure increases the probability of voters switching preferences. As such, the results are consistent with those above, with independent voters showing a lower likelihood of switching voting preferences and those with strong political views showing a higher likelihood of switching. 
+```{r echo = TRUE, results ='hide'}
+# New Table E7 with Interaction (This is an alternative where we estimate a separate coefficient on exposure for each type of political strength)
+
+vote_rank_total_russia_count_lm_controls_new <- lm(voted_trump_versus_clinton ~  total_exposure_russia_log * pol_strength + age + gender + education + income + race + region + internet_social_media_w1, data = us2016_recoded)
+summary(vote_rank_total_russia_count_lm_controls_new)
+
+confint(vote_rank_total_russia_count_lm_controls_new)
+
+
+
+vote_rank_total_russia_count_lm_controls_black_new <- lm(voted_trump_versus_clinton ~  total_exposure_russia_log * pol_strength + age + gender + education + income + race_other_hispanic + race_black + region + internet_social_media_w1, data = us2016_recoded)
+summary(vote_rank_total_russia_count_lm_controls_black_new)
+
+confint(vote_rank_total_russia_count_lm_controls_black_new)
+
+
+
+vote_rank_total_russia_count_lm_controls_total_tweets_new <- lm(voted_trump_versus_clinton ~  total_exposure_russia_log * pol_strength + age + gender + education + income + race_other_hispanic + race_black + region + internet_social_media_w1 + total_tweets_log, data = us2016_recoded)
+summary(vote_rank_total_russia_count_lm_controls_total_tweets_new)
+
+confint(vote_rank_total_russia_count_lm_controls_total_tweets_new)
+
+```
+
+```{r}
+tab_model (vote_rank_total_russia_count_lm_controls_new, vote_rank_total_russia_count_lm_controls_black_new, vote_rank_total_russia_count_lm_controls_total_tweets_new, pred.labels = c ("Constant", "Exposure - Independent", "Political Views - Lean", "Political Views - Not Strong", "Political Views - Strong", "Age", "Woman", "College-educated", "Income", "Person of Color", "Region: Northeast", "Region: Midwest", "Region: West", "Freq. of social media use", "Exposure - Lean", "Exposure - Not Strong", "Exposure - Strong", "Other/Hispanic", "Black", "log(Total Tweets)"),  title = "Table 5: Non-linear effects of exposure to Russian tweets on the likelihood of shifting voter preference towards Trump, a no vote, or a 3rd candidate", digits = 3, 
+           dv.labels = c("(1)", "(2)", "(3)"),
+           order.terms = c(2, 15, 16, 17, 3, 4, 5, 6, 7, 8, 9, 10, 18, 19, 11, 12, 13, 20, 14, 1), 
+            p.style = "stars", show.ci = FALSE, vcov.fun = "HC0", show.se = TRUE)
+```
+
+In table 5, none of the coefficients on our variables of interest are significant. Interestingly, however, the pattern of coefficients is different to the results above, with positive coefficients for independents and negative for strong voters. Similar to the results from using the alternative interaction term, therefore, the results suggest that when accounting for the possibility of switching to third candidates or not voting results are generally insignificant, and in this case showing opposite signs to when using the alternative dependent variables.
+
+```{r echo = TRUE, results ='hide'}
+# New Table E8 with Interaction (This is an alternative where we estimate a separate coefficient on exposure for each type of political strength)
+
+vote_rank_total_russia_count_lm_controls_new3 <- lm(voted_trump_versus_clinton_benefit ~  total_exposure_russia_log * pol_strength + age + gender + education + income + race + region + internet_social_media_w1, data = us2016_recoded)
+summary(vote_rank_total_russia_count_lm_controls_new3)
+
+confint(vote_rank_total_russia_count_lm_controls_new3)
+
+
+
+vote_rank_total_russia_count_lm_controls_black_new3 <- lm(voted_trump_versus_clinton_benefit ~  total_exposure_russia_log * pol_strength + age + gender + education + income + race_other_hispanic + race_black + region + internet_social_media_w1, data = us2016_recoded)
+summary(vote_rank_total_russia_count_lm_controls_black_new3)
+
+confint(vote_rank_total_russia_count_lm_controls_black_new3)
+
+
+vote_rank_total_russia_count_lm_controls_total_tweets_new3 <- lm(voted_trump_versus_clinton_benefit ~  total_exposure_russia_log * pol_strength + age + gender + education + income + race_other_hispanic + race_black + region + internet_social_media_w1 + total_tweets_log, data = us2016_recoded)
+summary(vote_rank_total_russia_count_lm_controls_total_tweets_new3)
+
+confint(vote_rank_total_russia_count_lm_controls_total_tweets_new3)
+```
+
+```{r}
+tab_model (vote_rank_total_russia_count_lm_controls_new3, vote_rank_total_russia_count_lm_controls_black_new3, vote_rank_total_russia_count_lm_controls_total_tweets_new3, pred.labels = c ("Constant", "Exposure - Independent", "Political Views - Lean", "Political Views - Not Strong", "Political Views - Strong", "Age", "Woman", "College-educated", "Income", "Person of Color", "Region: Northeast", "Region: Midwest", "Region: West", "Freq. of social media use", "Exposure - Lean", "Exposure - Not Strong", "Exposure - Strong", "Other/Hispanic", "Black", "log(Total Tweets)"),  title = "Table 6: Nonlinear effect of exposure to Russian tweets on 
+  changes in voting preferences between the 1st wave of the 
+       YouGov survey and the actual vote", digits = 3, 
+           dv.labels = c("(1)", "(2)", "(3)"),
+           order.terms = c(2, 15, 16, 17, 3, 4, 5, 6, 7, 8, 9, 10, 18, 19, 11, 12, 13, 20, 14, 1), 
+            p.style = "stars", show.ci = FALSE, vcov.fun = "HC0", show.se = TRUE)
+```
+In table 6 we find the strongest results. Higher exposure reduces the likelihood of changing voting preferences for independents, while it increases the probability for all other groups, with the effects being somewhat larger for strong groups. That this case represents actual voting patterns, it provides the strongest evidence that some groups are significantly affected by exposure to Russian tweets.
+
+## 4. Conclusions
+
+The results provide some partial support for the view that exposure to Russian tweets does have non-linear effects. Specifically, the evidence suggests that higher exposure to Russian tweets is more likely to encourage voters with strong political preferences to switch their voting intentions towards Trump, but to lower the probability of voters with more independent political views to switch towards Trump. This is the opposite of the hypothesis tested, which was that more independent voters would be more likely to be influenced by exposure to Russian tweets (Fujiwara et al, 2023). These results are found to be robust to two alternative approaches to accounting for non-linearities, as well as to alternative definitions of the dependent variable and to the inclusion of different explanatory variables.
+
+The explanation for such results is not so clear but may partly reflect that independents are less likely to be swayed by outside noise in their vote choice, potentially because they access a wide range of knowledge in reaching their voting choice. Conversely, those with stronger political views are perhaps less likely to receive signals contrary to their political opinions, such that when they do it has a greater impact on their voting patterns. If such results are found to hold in other studies, they suggest that those wanting to influence outcomes of elections (or other voting choices) are likely to be more effective if they are able to focus on changing the opinions of those with stronger views. 
+
+
+## References
+
+Eady, G., Paskhalis, T., Zilinsky, J., Bonneau, R., Nagler, J., & Tucker, J. A. (2023). Exposure to the Russian Internet Research Agency foreign influence campaign on Twitter in the 2016 US election and its relationship to attitudes and voting behavior. Nature Communications, 14(1), 62. doi: https://doi.org/10.1038/s41467-022-35576-9
+
+Freese, J., & Peterson, D. (2017). Replication in social science. *Annual Review of Sociology*, 43, 147-165, [doi: 10.1146](https://www.annualreviews.org/doi/abs/10.1146/annurev-soc-060116-053450).
+
+Fujiwara, T., Müller, K. and Schwarz, C. (2022). The Effect of Social Media on Elections: Evidence from the United States. SSRN Electronic Journal. [online] doi:https://doi.org/10.2139/ssrn.3719998.
+
+Garcia, D. (2023). Influence of Facebook algorithms on political polarization tested. Nature. [online] doi:https://doi.org/10.1038/d41586-023-02325-x.
+
+Nadeem, R. (2023). Voting patterns in the 2022 elections. [online] Pew Research Center - U.S. Politics & Policy. Available at: https://www.pewresearch.org/politics/2023/07/12/voting-patterns-in-the-2022-elections/ [Accessed 14 May 2024].
+
+Pew Research Center (2020). Voters Rarely Switch Parties, but Recent Shifts Further Educational, Racial Divergence. [online] 
+
+Pew Research Center (2023). U.S. Politics & Policy. Available at: https://www.pewresearch.org/politics/2020/08/04/voters-rarely-switch-parties-but-recent-shifts-further-educational-racial-divergence/ [Accessed 14 May 2024].
+
+Tpaskhalis (2023) Tpaskhalis/NCOMMS_RUSSIA_US_2016: Replication materials for ‘exposure to the Russian Internet Research Agency Foreign Influence Campaign on Twitter in the 2016 US election and its relationship to attitudes and voting behavior’, GitHub. Available at: https://github.com/tpaskhalis/ncomms_russia_us_2016  (Accessed: 8 May 2024).  
+
+Weeks, B.E., Lane, D.S., Kim, D.H., Lee, S.S. and Kwak, N. (2017). Incidental Exposure, Selective Exposure, and Political Information Sharing: Integrating Online Exposure Patterns and Expression on Social Media. Journal of Computer-Mediated Communication, 22(6), pp.363–379. doi:https://doi.org/10.1111/jcc4.12199.
+
+
+## Appendix
+
+### Appendix 1. My enviroment (full information) 
+
+```{r session}
+# Detailed information about my environment
+sessionInfo()
+```
+
+### Appendix 2. Entire R code used in the project
+
+```{r ref.label=knitr::all_labels(), echo=TRUE, eval=FALSE}
+```
